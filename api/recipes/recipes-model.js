@@ -1,59 +1,53 @@
-/**
- * @param { import("knex").Knex } knex
- * @returns { Promise<void> } 
- */
-
- const recipes = [
-  { name: 'Broccoli Pesto Pasta' },
-  { name: 'Lemon Chicken' },
-  { name: 'Salmon en Papillote' }
-]
-
-const ingredients = [
-  { name: 'Broccoli', unit: 'lbs' },
-  { name: 'Pesto', unit: 'lbs' },
-  { name: 'Pasta', unit: 'lbs' },
-  { name: 'Lemon', unit: 'slices' },
-  { name: 'Chicken', unit: 'kilos' },
-  { name: 'Salmon', unit: 'grams' }
-]
-
-const steps = [
-  //Broccoli Pesto Pasta
-  { instructions: "Heat pan", step_number: 1, recipe_id: 1 },
-  { instructions: "Add broccoli", step_number: 2, recipe_id: 1 },
-  { instructions: "Add pesto mixed with pasta", step_number: 3, recipe_id: 1 },
-  //Lemon Chicken
-  { instructions: "Heat oven really hot", step_number: 1, recipe_id: 2 },
-  { instructions: "Put chicken and lemon in oven", step_number: 2, recipe_id: 2 },
-  { instructions: "Put in oven at 500 degrees", step_number: 3, recipe_id: 2 },
-  //Salmon en Papillote
-  { instructions: "Catch a fish", step_number: 1, recipe_id: 3 },
-  { instructions: "Cook it", step_number: 2, recipe_id: 3 }
-]
-
-const ingredients_steps = [
-  //Broccoli Pesto Pasta
-  { quantity: 3.2, step_id: 2, ingredients_id: 1 },
-  { quantity: 1.5, step_id: 3, ingredients_id: 2 },
-  { quantity: 3.3, step_id: 3, ingredients_id: 3 },
-  //Lemon Chicken
-  { quantity: 1, step_id: 5, ingredients_id: 4 },
-  { quantity: .4, step_id: 5, ingredients_id: 5 },
-  //Salmon en Papillote
-  { quantity: 7, step_id: 7, ingredients_id: 6 }
-]
-
-exports.seed = async function(knex) {
-  // Deletes ALL existing entries
-  await knex('ingredients_steps').truncate()
-  await knex('steps').truncate()
-  await knex('ingredients').truncate()
-  await knex('recipes').truncate()
+const db = require('../../data/db-config')
 
 
-  await knex('recipes').insert(recipes)
-  await knex('ingredients').insert(ingredients)
-  await knex('steps').insert(steps)
-  await knex('ingredients_steps').insert(ingredients_steps)
-};
+const getRecipeById = async id => {
+  return rows = await db('recipes')
+    .where('recipes.id', id)
+    .leftJoin('steps', 'recipes.id', 'steps.recipe_id')
+    .leftJoin('ingredients_steps', 'steps.id', 'ingredients_steps.step_id')
+    .leftJoin('ingredients', 'ingredients_steps.ingredients_id', 'ingredients.id')
+    .select('recipes.id as recipe_id', 'recipes.name as recipe_name', 'steps.id as steps_id', 'steps.step_number', 'steps.instructions', 'ingredients_steps.quantity', 'ingredients_steps.ingredients_id as ingredient_id', 'ingredients.name as ingredient_name')
+
+  const recipe_with_steps = {
+    recipe_id: rows[0].recipe_id,
+    recipe_name: rows[0].recipe_name,
+    steps: []
+  }
+
+  rows.forEach((row, i) => {
+    if (row.steps_id) {
+      recipe_with_steps.steps.push({
+        step_id: row.step_id,
+        step_number: row.step_number,
+        step_instructions: row.step_instructions,
+        ingredients: rows.filter(ingredient => ingredient.ingredient_id !==null && ingredient.steps_id === row.steps_id)
+          .map(obj => {
+            return {ingredient_id: obj.ingredient_id, ingredient_name: obj.ingredient_name, quantity: obj.quantity}
+          })
+        
+      })
+      //need to figure out how to not repeat steps... there is a row for each ingredient so that might be best place to start rather than with steps
+      // if (row.ingredient_id) {
+      //   recipe_with_steps.steps[i].ingredients.push({
+
+      //   })
+      // }
+
+    }
+  })
+
+
+  return recipe_with_steps
+    //   SELECT recipes.id, recipes.name, steps.id, steps.step_number, steps.instructions, ingredients_steps.quantity, ingredients_steps.ingredients_id as ingredient_id, ingredients.name as ingredient_name
+    // FROM recipes 
+    // LEFT JOIN steps on recipes.id=steps.recipe_id
+    // LEFT JOIN ingredients_steps ON steps.id=ingredients_steps.step_id
+    // LEFT JOIN ingredients ON ingredients_steps.ingredients_id=ingredients.id
+    // WHERE recipes.id=1
+    
+}
+
+module.exports = {
+  getRecipeById
+}
